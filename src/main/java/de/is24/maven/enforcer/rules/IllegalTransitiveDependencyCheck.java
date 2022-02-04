@@ -2,19 +2,21 @@ package de.is24.maven.enforcer.rules;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.resolver.AbstractArtifactResolutionException;
-import org.apache.maven.artifact.resolver.ArtifactResolver;
+import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.enforcer.rule.api.EnforcerRule;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleException;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleHelper;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
 import org.apache.maven.plugin.logging.Log;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.shared.dependency.graph.DependencyGraphBuilder;
-import org.apache.maven.shared.dependency.graph.DependencyGraphBuilderException;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.repository.RepositorySystem;
+import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilder;
+import org.apache.maven.shared.dependency.graph.DependencyCollectorBuilderException;
 import org.apache.maven.shared.dependency.graph.DependencyNode;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
-import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluator;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.StringUtils;
 
@@ -27,7 +29,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-
 /**
  * Rule enforcing directly declared maven dependencies only
  *
@@ -38,17 +39,19 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
   private static final String OUTPUT_FILE_EXTENSION = ".txt";
   private static final String OUTPUT_FILE_PREFIX = "itd-";
 
-  private ArtifactResolver resolver;
-
   private ArtifactRepository localRepository;
 
-  private DependencyGraphBuilder dependencyGraphBuilder;
-
   private List<ArtifactRepository> remoteRepositories;
+
+  private RepositorySystem repoSystem;
 
   private String outputDirectory;
 
   private MavenProject project;
+
+  private MavenSession session;
+
+  private DependencyCollectorBuilder dependencyCollectorBuilder;
 
   private Log logger;
 
@@ -64,7 +67,6 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
 
   private ClassFilter filter;
 
-
   @Override
   public void execute(EnforcerRuleHelper helper) throws EnforcerRuleException {
     logger = helper.getLog();
@@ -75,7 +77,6 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
 
     if (listMissingArtifacts) {
       logger.info("Flag 'listMissingArtifacts' is set. Transitively used artifacts are resolved.");
-      initializeDependencyGraphBuilder(helper);
     }
 
     if (useClassesFromLastBuild) {
@@ -86,8 +87,6 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
       logger.info(
         "Flag 'suppressTypesFromJavaRuntime' is set. Classes available in current Java-runtime will be ignored.");
     }
-
-    initializeArtifactResolver(helper);
 
     initializeProject(helper);
 
@@ -143,8 +142,14 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
   private Set<Artifact> resolveTransitiveDependencies(Artifact artifact) throws EnforcerRuleException {
     final DependencyNode root;
     try {
-      root = dependencyGraphBuilder.buildDependencyGraph(project, null);
-    } catch (DependencyGraphBuilderException e) {
+        ProjectBuildingRequest buildingRequest = new DefaultProjectBuildingRequest(session.getProjectBuildingRequest());
+        buildingRequest.setResolveDependencies(true);
+        buildingRequest.setProject(project);
+        buildingRequest.setLocalRepository(localRepository);
+        buildingRequest.setRemoteRepositories( remoteRepositories );
+        
+        root = dependencyCollectorBuilder.collectDependencyGraph(buildingRequest, null); 
+    } catch (DependencyCollectorBuilderException e) {
       throw new EnforcerRuleException("Unable to build the dependency graph!", e);
     }
     if (logger.isDebugEnabled()) {
@@ -181,44 +186,37 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
 
   @SuppressWarnings("unchecked")
   private Set<Artifact> resolveDirectDependencies(Artifact artifact) {
-    final Set<Artifact> dependencies = new HashSet<Artifact>(project.getDependencyArtifacts());
+    final Set<Artifact> dependencies = new HashSet<Artifact>(project.getArtifacts());
+    final Set<Artifact> directDependencies = new HashSet<Artifact>(project.getDependencyArtifacts());
+    dependencies.removeIf(dep -> !directDependencies.contains(dep));
     dependencies.remove(artifact);
     if (logger.isDebugEnabled()) {
       logger.debug("Direct dependencies are '" + dependencies + "'.");
     }
+    dependencies.stream().forEach(dep -> enforceArtifactResolution(dep));
     return dependencies;
   }
 
   @SuppressWarnings("unchecked")
-  private void initializeProject(ExpressionEvaluator helper) throws EnforcerRuleException {
+  private void initializeProject(EnforcerRuleHelper helper) throws EnforcerRuleException {
     try {
       project = (MavenProject) helper.evaluate("${project}");
+      session = (MavenSession) helper.evaluate("${session}");
+      dependencyCollectorBuilder = helper.getComponent(DependencyCollectorBuilder.class);
 
       localRepository = (ArtifactRepository) helper.evaluate("${localRepository}");
       remoteRepositories = (List<ArtifactRepository>) helper.evaluate("${project.remoteArtifactRepositories}");
+      repoSystem = helper.getComponent(RepositorySystem.class);
 
       outputDirectory = (String) helper.evaluate("${project.build.directory}");
 
     } catch (ExpressionEvaluationException e) {
-      throw new EnforcerRuleException("Unable to locate Maven project and/or repositories!", e);
+      throw new EnforcerRuleException("Unable to evaluate expression!", e);
+    }
+    catch ( ComponentLookupException e ) {
+        throw new EnforcerRuleException("Unable to locate Component!", e);
     }
     logger.debug("Analyze project '" + project + "'.");
-  }
-
-  private void initializeArtifactResolver(EnforcerRuleHelper helper) throws EnforcerRuleException {
-    try {
-      resolver = (ArtifactResolver) helper.getComponent(ArtifactResolver.class);
-    } catch (ComponentLookupException e) {
-      throw new EnforcerRuleException("Unable to lookup artifact resolver!", e);
-    }
-  }
-
-  private void initializeDependencyGraphBuilder(EnforcerRuleHelper helper) throws EnforcerRuleException {
-    try {
-      dependencyGraphBuilder = helper.getContainer().lookup(DependencyGraphBuilder.class, "default");
-    } catch (ComponentLookupException e) {
-      throw new EnforcerRuleException("Unable to lookup dependency graph builder!", e);
-    }
   }
 
   private Artifact resolveArtifact() throws EnforcerRuleException {
@@ -251,16 +249,13 @@ public final class IllegalTransitiveDependencyCheck implements EnforcerRule {
     return null;
   }
 
-  private Artifact enforceArtifactResolution(Artifact artifact) throws EnforcerRuleException {
+  private Artifact enforceArtifactResolution(Artifact artifact) {
     logger.debug("Enforce artifact resolution for project '" + project + "'.");
-    try {
-      resolver.resolve(artifact, remoteRepositories, localRepository);
-      return artifact;
-    } catch (AbstractArtifactResolutionException e) {
-      final String error = "Unable to resolve artifact '" + artifact.getId() + "'!";
-      logger.error(error, e);
-      throw new EnforcerRuleException(error, e);
-    }
+    ArtifactResolutionRequest req = new ArtifactResolutionRequest()
+      .setLocalRepository(localRepository).setRemoteRepositories(remoteRepositories)
+      .setArtifact(artifact);
+    repoSystem.resolve(req);
+    return artifact;
   }
 
   private String buildOutput(Artifact artifact, Set<String> unresolvedTypes) throws EnforcerRuleException {

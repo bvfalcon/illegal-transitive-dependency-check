@@ -1,4 +1,7 @@
 # ignored resources
 .idea
 *.iml
-target
+target/
+.classpath
+.project
+.settings/

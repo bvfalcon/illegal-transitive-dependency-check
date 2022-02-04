@@ -3,11 +3,9 @@ package de.is24.maven.enforcer.rules;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleHelper;
 import org.codehaus.plexus.PlexusContainer;
-import org.codehaus.plexus.PlexusContainerException;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
 import org.codehaus.plexus.component.composition.CycleDetectedInComponentGraphException;
 import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
-import org.codehaus.plexus.component.discovery.ComponentDiscoveryListener;
 import org.codehaus.plexus.component.repository.ComponentDescriptor;
 import org.codehaus.plexus.component.repository.exception.ComponentLifecycleException;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
@@ -70,8 +68,15 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
   }
 
   @Override
-  public Object getComponent(Class clazz) throws ComponentLookupException {
-    return getComponent(clazz.getName());
+  public <T> T getComponent( Class<T> clazz, String roleHint )
+      throws ComponentLookupException
+  {
+      return (T) getComponent(clazz);
+  }
+
+  @Override
+  public <T> T getComponent(Class<T> clazz) throws ComponentLookupException {
+    return (T) getComponent(clazz.getName());
   }
 
   @Override
@@ -150,18 +155,8 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public <T> T lookup(ComponentDescriptor<T> componentDescriptor) throws ComponentLookupException {
-      return plexusContainer.lookup(componentDescriptor);
-    }
-
-    @Override
     public List<Object> lookupList(String role) throws ComponentLookupException {
       return plexusContainer.lookupList(role);
-    }
-
-    @Override
-    public List<Object> lookupList(String role, List<String> roleHints) throws ComponentLookupException {
-      return plexusContainer.lookupList(role, roleHints);
     }
 
     @Override
@@ -170,33 +165,13 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public <T> List<T> lookupList(Class<T> type, List<String> roleHints) throws ComponentLookupException {
-      return plexusContainer.lookupList(type, roleHints);
-    }
-
-    @Override
     public Map<String, Object> lookupMap(String role) throws ComponentLookupException {
       return plexusContainer.lookupMap(role);
     }
 
     @Override
-    public Map<String, Object> lookupMap(String role, List<String> roleHints) throws ComponentLookupException {
-      return plexusContainer.lookupMap(role, roleHints);
-    }
-
-    @Override
     public <T> Map<String, T> lookupMap(Class<T> type) throws ComponentLookupException {
       return plexusContainer.lookupMap(type);
-    }
-
-    @Override
-    public <T> Map<String, T> lookupMap(Class<T> type, List<String> roleHints) throws ComponentLookupException {
-      return plexusContainer.lookupMap(type, roleHints);
-    }
-
-    @Override
-    public ComponentDescriptor<?> getComponentDescriptor(String role) {
-      return plexusContainer.getComponentDescriptor(role);
     }
 
     @Override
@@ -230,9 +205,9 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public void addComponentDescriptor(ComponentDescriptor<?> componentDescriptor)
-                                throws CycleDetectedInComponentGraphException {
-      plexusContainer.addComponentDescriptor(componentDescriptor);
+    public <T> void addComponentDescriptor(ComponentDescriptor<T> componentDescriptor)
+        throws CycleDetectedInComponentGraphException {
+        plexusContainer.addComponentDescriptor(componentDescriptor);
     }
 
     @Override
@@ -281,11 +256,6 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public void addContextValue(Object key, Object value) {
-      plexusContainer.addContextValue(key, value);
-    }
-
-    @Override
     public Context getContext() {
       return plexusContainer.getContext();
     }
@@ -296,42 +266,8 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public void registerComponentDiscoveryListener(ComponentDiscoveryListener listener) {
-      plexusContainer.registerComponentDiscoveryListener(listener);
-    }
-
-    @Override
-    public void removeComponentDiscoveryListener(ComponentDiscoveryListener listener) {
-      plexusContainer.removeComponentDiscoveryListener(listener);
-    }
-
-    @Override
-    public List<ComponentDescriptor<?>> discoverComponents(ClassRealm childRealm)
-                                                    throws PlexusConfigurationException,
-                                                           CycleDetectedInComponentGraphException {
-      return plexusContainer.discoverComponents(childRealm);
-    }
-
-    @Override
-    public List<ComponentDescriptor<?>> discoverComponents(ClassRealm realm, Object data)
-                                                    throws PlexusConfigurationException,
-                                                           CycleDetectedInComponentGraphException {
-      return plexusContainer.discoverComponents(realm, data);
-    }
-
-    @Override
     public ClassRealm createChildRealm(String id) {
       return plexusContainer.createChildRealm(id);
-    }
-
-    @Override
-    public ClassRealm getComponentRealm(String realmId) {
-      return plexusContainer.getComponentRealm(realmId);
-    }
-
-    @Override
-    public void removeComponentRealm(ClassRealm componentRealm) throws PlexusContainerException {
-      plexusContainer.removeComponentRealm(componentRealm);
     }
 
     @Override
@@ -345,18 +281,21 @@ final class EnforcerRuleHelperWrapper implements EnforcerRuleHelper {
     }
 
     @Override
-    public ClassRealm getLookupRealm(Object component) {
-      return plexusContainer.getLookupRealm(component);
-    }
-
-    @Override
-    public void addComponent(Object component, String role) throws CycleDetectedInComponentGraphException {
-      plexusContainer.addComponent(component, role);
-    }
-
-    @Override
     public <T> void addComponent(T component, Class<?> role, String roleHint) {
       objects.put(role.getCanonicalName() + "#" + roleHint, component);
+    }
+
+    @Override
+    public void addComponent( Object component, String role )
+    {
+        plexusContainer.addComponent(component, role);
+    }
+
+    @Override
+    public List<ComponentDescriptor<?>> discoverComponents( ClassRealm classRealm )
+        throws PlexusConfigurationException
+    {
+        return plexusContainer.discoverComponents(classRealm);
     }
   }
 }

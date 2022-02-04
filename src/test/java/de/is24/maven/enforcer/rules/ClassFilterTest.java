@@ -1,6 +1,6 @@
 package de.is24.maven.enforcer.rules;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.logging.Log;
 import org.junit.Test;
 

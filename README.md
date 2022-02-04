@@ -19,12 +19,12 @@ You can run the check by configuring the maven-enforcer-plugin to make use of th
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>1.3.1</version>
+        <version>3.0.0</version>
         <dependencies>
           <dependency>
             <groupId>de.is24.maven.enforcer.rules</groupId>
             <artifactId>illegal-transitive-dependency-check</artifactId>
-            <version>1.7.4</version>
+            <version>1.8-SNAPSHOT</version>
           </dependency>
         </dependencies>
         <executions>
@@ -34,22 +34,22 @@ You can run the check by configuring the maven-enforcer-plugin to make use of th
             <goals>
               <goal>enforce</goal>
             </goals>
-            <configuration>
-              <rules>
-                <illegalTransitiveDependencyCheck implementation="de.is24.maven.enforcer.rules.IllegalTransitiveDependencyCheck">
-                  <reportOnly>false</reportOnly>
-                  <useClassesFromLastBuild>true</useClassesFromLastBuild>
-                  <suppressTypesFromJavaRuntime>true</suppressTypesFromJavaRuntime>
-                  <regexIgnoredClasses>
-                      <regexIgnoredClass>javax\..+</regexIgnoredClass>
-                      <regexIgnoredClass>org\.hibernate\..+</regexIgnoredClass>
-                  </regexIgnoredClasses>
-                  <listMissingArtifacts>false</listMissingArtifacts>
-                </illegalTransitiveDependencyCheck>
-              </rules>
-            </configuration>
           </execution>
         </executions>
+        <configuration>
+          <rules>
+            <illegalTransitiveDependencyCheck implementation="de.is24.maven.enforcer.rules.IllegalTransitiveDependencyCheck">
+              <reportOnly>false</reportOnly>
+              <useClassesFromLastBuild>true</useClassesFromLastBuild>
+              <suppressTypesFromJavaRuntime>true</suppressTypesFromJavaRuntime>
+              <regexIgnoredClasses>
+                  <regexIgnoredClass>javax\..+</regexIgnoredClass>
+                  <regexIgnoredClass>org\.hibernate\..+</regexIgnoredClass>
+              </regexIgnoredClasses>
+              <listMissingArtifacts>false</listMissingArtifacts>
+            </illegalTransitiveDependencyCheck>
+          </rules>
+        </configuration>
       </plugin>
     </plugins>
   </build>

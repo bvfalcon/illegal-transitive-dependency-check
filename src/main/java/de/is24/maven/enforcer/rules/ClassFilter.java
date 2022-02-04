@@ -1,8 +1,12 @@
 package de.is24.maven.enforcer.rules;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.NameFileFilter;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.maven.plugin.logging.Log;
 import org.codehaus.plexus.util.StringUtils;
 
+import java.io.File;
 import java.net.URL;
 import java.util.Collection;
 import java.util.HashMap;
@@ -16,7 +20,7 @@ final class ClassFilter {
     "(java\\.[\\w\\.\\$]*)";
 
   // path of current Java runtime environment
-  private static final String JAVA_HOME_PATH = "file:" + System.getProperty("java.home");
+  private static final String JAVA_HOME_PATH = System.getProperty("java.home");
   private static final Pattern JAVA_RUNTIME_PACKAGES = Pattern.compile(
     "^(javax|com\\.sun|org|sun|jdk)\\..+");
 
@@ -61,8 +65,11 @@ final class ClassFilter {
       final String classResource = type.replace('.', '/') + ".class";
       final URL it = ClassLoader.getSystemClassLoader().getResource(classResource);
       if (it != null) {
-        final String sourcePath = it.getFile();
-        if (sourcePath.startsWith(JAVA_HOME_PATH)) {
+        String sourcePath = it.getPath();
+        if (sourcePath.startsWith("file:")) {
+          sourcePath = new File(sourcePath.substring(sourcePath.indexOf('/') + 1, sourcePath.indexOf('!'))).getName();
+        }
+        if (FileUtils.listFiles(new File(JAVA_HOME_PATH),new NameFileFilter(sourcePath), TrueFileFilter.INSTANCE).size() == 1) {
           if (logger.isDebugEnabled()) {
             logger.debug("Suppress type '" + type + "', it's in current Java runtime '" + JAVA_HOME_PATH + "'.");
           }
