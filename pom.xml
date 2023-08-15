@@ -44,7 +44,7 @@
     <enforcer.plugin.version>3.0.0</enforcer.plugin.version>
     <resolver-api.version>1.7.3</resolver-api.version>
     <build.plugin.version>3.8.1</build.plugin.version>
-    <maven.version>3.6.3</maven.version>
+    <maven.version>3.8.1</maven.version>
     <sl4j.version>1.7.32</sl4j.version>
     <asm.version>9.2</asm.version>
     <jdk.version>1.8</jdk.version>
